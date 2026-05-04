@@ -5,7 +5,6 @@ Apple 台灣配件頁面 新品追蹤器
 執行環境：GitHub Actions（或本機）
 """
 
-import hashlib
 import json
 import os
 import sys
@@ -73,28 +72,37 @@ def save_snapshot(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def send_discord(new_items: dict):
+def send_discord(new_items: dict, total_count: int):
     now = datetime.now().strftime("%Y/%m/%d %H:%M")
 
-    # 組 Discord Embed 訊息
-    fields = []
-    for name, info in list(new_items.items())[:20]:  # Discord 最多 25 個 fields
-        price = info.get("price", "N/A")
-        link  = info.get("link", "")
-        value = f"{price}"
-        if link:
-            value += f"\n[商品連結]({link})"
-        fields.append({"name": name, "value": value, "inline": True})
+    if new_items:
+        # 有新品：黑色 + 列出商品
+        title       = "🍎 Apple 配件 — 新上架通知"
+        description = f"偵測到 **{len(new_items)}** 項新商品　|　{now}"
+        color       = 0x000000
+
+        fields = []
+        for name, info in list(new_items.items())[:20]:
+            price = info.get("price", "N/A")
+            link  = info.get("link", "")
+            value = price
+            if link:
+                value += f"\n[商品連結]({link})"
+            fields.append({"name": name, "value": value, "inline": True})
+    else:
+        # 沒有新品：灰色 + 僅回報狀態
+        title       = "🔍 Apple 配件 — 今日檢查完成"
+        description = f"目前頁面共 **{total_count}** 項商品，**無新品上架**　|　{now}"
+        color       = 0x95a5a6  # 灰色
+        fields      = []
 
     payload = {
         "embeds": [{
-            "title": "🍎 Apple 台灣配件 — 新上架通知",
-            "description": f"偵測到 **{len(new_items)}** 項新商品　|　{now}",
-            "color": 0x000000,  # 黑色（Apple 風格）
+            "title": title,
+            "description": description,
+            "color": color,
             "fields": fields,
-            "footer": {
-                "text": "Apple 配件追蹤器"
-            },
+            "footer": {"text": "Apple 配件追蹤器　|　每日自動檢查"},
             "url": TARGET_URL,
         }]
     }
@@ -114,6 +122,16 @@ def main():
         current = fetch_accessories(TARGET_URL)
     except Exception as e:
         print(f"❌ 抓取失敗：{e}")
+        # 即使失敗也發通知，讓你知道出問題了
+        payload = {
+            "embeds": [{
+                "title": "❌ Apple 配件追蹤器 — 執行失敗",
+                "description": f"抓取頁面時發生錯誤：`{e}`",
+                "color": 0xe74c3c,  # 紅色
+                "footer": {"text": "Apple 配件追蹤器　|　每日自動檢查"},
+            }]
+        }
+        requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
         sys.exit(1)
 
     print(f"   目前偵測到 {len(current)} 項商品")
@@ -125,9 +143,11 @@ def main():
         print(f"🆕 發現 {len(new_items)} 項新上架：")
         for name in new_items:
             print(f"   • {name}")
-        send_discord(new_items)
     else:
-        print("   沒有新商品，下次再見！")
+        print("   沒有新商品")
+
+    # 不管有沒有新品，都發通知
+    send_discord(new_items, total_count=len(current))
 
     save_snapshot(current)
 
