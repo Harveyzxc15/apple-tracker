@@ -16,7 +16,7 @@ import requests
 from bs4 import BeautifulSoup
 
 # ─── 設定區 ───────────────────────────────────────────────────────
-TARGET_URL = "https://www.apple.com/tw/shop/buy-accessories"
+TARGET_URL = "https://www.apple.com/tw/shop/accessories/all/new-arrivals"
 
 # Discord Webhook URL
 # 本機執行時可直接填入；GitHub Actions 請設定在 Secrets（變數名稱：DISCORD_WEBHOOK_URL）
